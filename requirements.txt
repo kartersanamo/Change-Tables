@@ -1,0 +1,1 @@
+# Change Tables uses only the Python standard library (tkinter).
