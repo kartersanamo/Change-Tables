@@ -41,9 +41,3 @@ Rules load from `rules.json` by default. You can pick a different rules file in 
 - **word_30_fallback** — when `true`, any leftover `*_WORD_30` tokens are auto-converted (e.g. `FOO_WORD_30` → `FOO_WORD 1`)
 
 Add, remove, or edit entries in the JSON file — no code changes needed.
-
-## Tests
-
-```bash
-python3 -m unittest test_engine.py -v
-```
