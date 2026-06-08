@@ -1,6 +1,6 @@
 # Change Tables
 
-A simple Python app that converts PLC export text files using rules from `rules.json`.
+A simple Python app that converts PLC export text files using editable replacement rules.
 
 ## Requirements
 
@@ -13,11 +13,18 @@ A simple Python app that converts PLC export text files using rules from `rules.
 python3 main.py
 ```
 
+### Convert tab
 1. Choose an **input** `.txt` file
 2. Choose an **output** path
 3. Click **Apply Changes**
 
-Rules load from `rules.json` by default. You can pick a different rules file in the GUI.
+### Edit Rules tab
+- Edit **global rules** (simple find/replace anywhere in the file)
+- Edit **line rules** (replace an entire line when it contains a matching anchor)
+- Toggle **auto-convert** for leftover `*_WORD_30` tokens
+- Click **Save Rules** to write changes to `rules.json`
+
+Apply Changes uses the current rules in the editor, even before saving.
 
 ## Rules format (`rules.json`)
 
@@ -25,10 +32,7 @@ Rules load from `rules.json` by default. You can pick a different rules file in 
 {
   "word_30_fallback": true,
   "lines": [
-    {
-      "find": "text that appears in a line",
-      "replace": "the full new line"
-    }
+    { "find": "anchor text", "replace": "full new line" }
   ],
   "global": [
     { "old": "OR_WORD_30", "new": "OR_WORD 1" }
@@ -36,8 +40,10 @@ Rules load from `rules.json` by default. You can pick a different rules file in 
 }
 ```
 
-- **lines** — if a line contains `find`, the whole line is replaced with `replace` (checked top to bottom)
-- **global** — find-and-replace anywhere in the file (runs after line rules)
-- **word_30_fallback** — when `true`, any leftover `*_WORD_30` tokens are auto-converted (e.g. `FOO_WORD_30` → `FOO_WORD 1`)
+You can edit rules in the GUI or directly in the JSON file.
 
-Add, remove, or edit entries in the JSON file — no code changes needed.
+## Tests
+
+```bash
+python3 -m unittest test_engine.py -v
+```

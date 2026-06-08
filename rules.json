@@ -23,10 +23,25 @@
     }
   ],
   "global": [
-    { "old": "OR_WORD_30", "new": "OR_WORD 1" },
-    { "old": "NOT_WORD_30", "new": "NOT_WORD 1" },
-    { "old": "XOR_WORD_30", "new": "XOR_WORD 1" },
-    { "old": "AND_WORD_30", "new": "AND_WORD 1" },
-    { "old": "MASK_COMP_WORD_30", "new": "MASK_COMP_WORD" }
+    {
+      "old": "OR_WORD_30",
+      "new": "OR_WORD 1"
+    },
+    {
+      "old": "NOT_WORD_30",
+      "new": "NOT_WORD 1"
+    },
+    {
+      "old": "XOR_WORD_30",
+      "new": "XOR_WORD 1"
+    },
+    {
+      "old": "AND_WORD_30",
+      "new": "AND_WORD 1"
+    },
+    {
+      "old": "MASK_COMP_WORD_30",
+      "new": "MASK_COMP_WORD"
+    }
   ]
 }
