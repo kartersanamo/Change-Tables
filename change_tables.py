@@ -19,7 +19,7 @@ class ChangeTablesApp(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
         self.title("Change Tables")
-        self.geometry("750x550")
+        self.geometry("750x625")
 
         self.input_path = tk.StringVar()
         self.output_path = tk.StringVar()
