@@ -7,10 +7,23 @@ A simple Python app that converts PLC export text files using editable replaceme
 - Python 3
 - tkinter (included with most Python installs)
 
-## Run the app
+## Instructions to run the app
 
 ```bash
-python3 main.py
+python -m venv .venv
+```
+Mac
+```
+source .venv/bin/activate
+```
+Windows/Powershell
+```
+.venv\Scripts\Activate.ps1
+```
+Then
+```
+python -m pip install -r requirements.txt
+python main.py
 ```
 
 ### Convert tab
