@@ -1,13 +1,12 @@
-#!/usr/bin/env python3
-"""Change Tables — convert PLC export files using built-in transformation rules."""
+"""Tkinter GUI for Change Tables."""
 
+import json
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
-from compare_tool import DEFAULT_EXPECTED, compare_files, format_report
 from engine import GlobalRule, LineRule, rule_summary
-from rules import convert, get_rules
+from rules import DEFAULT_RULES_PATH, convert, get_rules, load_rules
 
 
 class ChangeTablesApp(tk.Tk):
@@ -18,6 +17,7 @@ class ChangeTablesApp(tk.Tk):
 
         self.input_path = tk.StringVar()
         self.output_path = tk.StringVar()
+        self.rules_path = tk.StringVar(value=str(DEFAULT_RULES_PATH))
 
         self._build_ui()
 
@@ -32,7 +32,7 @@ class ChangeTablesApp(tk.Tk):
         )
         ttk.Label(
             main,
-            text="Convert a text file using built-in transformation rules stored in the program.",
+            text="Convert a text file using rules from rules.json.",
         ).grid(row=1, column=0, columnspan=3, sticky="w", pady=(0, 12))
 
         self._add_file_row(main, row=2, label="Input file (.txt):", variable=self.input_path, command=self._browse_input)
@@ -43,19 +43,25 @@ class ChangeTablesApp(tk.Tk):
             variable=self.output_path,
             command=self._browse_output,
         )
+        self._add_file_row(
+            main,
+            row=4,
+            label="Rules file (.json):",
+            variable=self.rules_path,
+            command=self._browse_rules,
+        )
 
         button_row = ttk.Frame(main)
-        button_row.grid(row=4, column=0, columnspan=3, sticky="ew", **padding)
+        button_row.grid(row=5, column=0, columnspan=3, sticky="ew", **padding)
         ttk.Button(button_row, text="Apply Changes", command=self._apply_changes).pack(side=tk.LEFT)
-        ttk.Button(button_row, text="Compare Output", command=self._compare_output).pack(side=tk.LEFT, padx=(8, 0))
         ttk.Button(button_row, text="Clear", command=self._clear).pack(side=tk.LEFT, padx=(8, 0))
 
-        ttk.Label(main, text="Log:").grid(row=5, column=0, sticky="nw", **padding)
+        ttk.Label(main, text="Log:").grid(row=6, column=0, sticky="nw", **padding)
         self.log = tk.Text(main, height=10, wrap=tk.WORD, state=tk.DISABLED)
-        self.log.grid(row=5, column=1, columnspan=2, sticky="nsew", **padding)
+        self.log.grid(row=6, column=1, columnspan=2, sticky="nsew", **padding)
 
         main.columnconfigure(1, weight=1)
-        main.rowconfigure(5, weight=1)
+        main.rowconfigure(6, weight=1)
 
     def _add_file_row(
         self,
@@ -89,6 +95,14 @@ class ChangeTablesApp(tk.Tk):
         if path:
             self.output_path.set(path)
 
+    def _browse_rules(self) -> None:
+        path = filedialog.askopenfilename(
+            title="Select rules file",
+            filetypes=[("JSON files", "*.json"), ("All files", "*.*")],
+        )
+        if path:
+            self.rules_path.set(path)
+
     def _log(self, message: str) -> None:
         self.log.configure(state=tk.NORMAL)
         self.log.insert(tk.END, message + "\n")
@@ -98,6 +112,7 @@ class ChangeTablesApp(tk.Tk):
     def _clear(self) -> None:
         self.input_path.set("")
         self.output_path.set("")
+        self.rules_path.set(str(DEFAULT_RULES_PATH))
         self.log.configure(state=tk.NORMAL)
         self.log.delete("1.0", tk.END)
         self.log.configure(state=tk.DISABLED)
@@ -105,6 +120,7 @@ class ChangeTablesApp(tk.Tk):
     def _apply_changes(self) -> None:
         input_file = Path(self.input_path.get().strip())
         output_file = Path(self.output_path.get().strip())
+        rules_file = Path(self.rules_path.get().strip())
 
         if not input_file.is_file():
             messagebox.showerror("Missing file", "Please select a valid input text file.")
@@ -112,19 +128,23 @@ class ChangeTablesApp(tk.Tk):
         if not output_file.name:
             messagebox.showerror("Missing file", "Please choose an output file path.")
             return
+        if not rules_file.is_file():
+            messagebox.showerror("Missing file", "Please select a valid rules.json file.")
+            return
 
         try:
+            load_rules(rules_file)
             source_text = input_file.read_text(encoding="utf-8")
-            modified_text = convert(source_text)
+            modified_text = convert(source_text, rules_file)
             output_file.write_text(modified_text, encoding="utf-8")
-        except OSError as exc:
-            messagebox.showerror("File error", str(exc))
+        except (OSError, ValueError, json.JSONDecodeError) as exc:
+            messagebox.showerror("Error", str(exc))
             self._log(f"Error: {exc}")
             return
 
         rules = get_rules()
         line_count, global_count = rule_summary(rules)
-        self._log(f"Applied {line_count} line rule(s) and {global_count} global rule(s) from program")
+        self._log(f"Loaded {line_count} line rule(s) and {global_count} global rule(s) from {rules_file.name}")
         for index, rule in enumerate(rules, start=1):
             if isinstance(rule, LineRule):
                 self._log(f"  {index}. [line] {rule.find!r}")
@@ -134,37 +154,7 @@ class ChangeTablesApp(tk.Tk):
         self._log(f"Wrote {output_file.name} ({len(modified_text)} characters)")
         messagebox.showinfo("Done", f"Saved modified file to:\n{output_file}")
 
-    def _compare_output(self) -> None:
-        output_file = Path(self.output_path.get().strip())
-        if not output_file.is_file():
-            messagebox.showerror("Missing file", "Please run Apply Changes first or choose an existing output file.")
-            return
-        if not DEFAULT_EXPECTED.is_file():
-            messagebox.showerror("Missing file", f"Expected reference file not found:\n{DEFAULT_EXPECTED}")
-            return
 
-        try:
-            result = compare_files(output_file, DEFAULT_EXPECTED)
-        except OSError as exc:
-            messagebox.showerror("Compare error", str(exc))
-            self._log(f"Compare error: {exc}")
-            return
-
-        report = format_report(result)
-        self._log("--- Compare with Modflt_New.txt ---")
-        for line in report.splitlines():
-            self._log(line)
-
-        if result.match:
-            messagebox.showinfo("Compare", report.splitlines()[0])
-        else:
-            messagebox.showwarning("Compare", report.splitlines()[0] + "\n\nSee log for diff details.")
-
-
-def main() -> None:
+def run_app() -> None:
     app = ChangeTablesApp()
     app.mainloop()
-
-
-if __name__ == "__main__":
-    main()

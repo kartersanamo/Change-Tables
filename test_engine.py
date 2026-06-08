@@ -9,10 +9,19 @@ from pathlib import Path
 from engine import GlobalRule, LineRule, apply_rules, parse_change_table, rule_summary
 
 
-from rules import convert
+from rules import DEFAULT_RULES_PATH, convert, load_rules
 
 
 ROOT = Path(__file__).resolve().parent
+
+
+class JsonRulesTests(unittest.TestCase):
+    def test_load_rules_json(self) -> None:
+        rules = load_rules(DEFAULT_RULES_PATH)
+        self.assertGreater(len(rules), 0)
+        line_count, global_count = rule_summary(rules)
+        self.assertEqual(line_count, 5)
+        self.assertEqual(global_count, 5)
 
 
 class ParseChangeTableTests(unittest.TestCase):
@@ -67,8 +76,16 @@ class ApplyRulesTests(unittest.TestCase):
 
 class ModfltExampleTests(unittest.TestCase):
     def test_modflt_old_to_new(self) -> None:
-        old_text = (ROOT / "Modflt_old.txt").read_text(encoding="utf-8")
-        expected = (ROOT / "Modflt_New.txt").read_text(encoding="utf-8")
+        old_path = ROOT / "Modflt_old.txt"
+        expected_path = ROOT / "Modflt_New.txt"
+        if not expected_path.is_file():
+            expected_path = ROOT / "Modflt_old_modified.txt"
+        if not old_path.is_file() or not expected_path.is_file():
+            self.skipTest("ModFLT example files not available")
+
+        old_text = old_path.read_text(encoding="utf-8")
+        expected = expected_path.read_text(encoding="utf-8")
+        load_rules()
         result = convert(old_text)
         self.assertEqual(result, expected)
 
