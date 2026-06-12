@@ -6,7 +6,7 @@ Change Tables applies **line rules** (replace a whole line when it contains a ma
 
 ## Download
 
-Get the latest release from [GitHub Releases](https://github.com/YOUR_USER/Change-Tables/releases).
+Get the latest release from [GitHub Releases](https://github.com/kartersanamo/Change-Tables/releases).
 
 | Platform | File | What you get |
 |----------|------|--------------|
