@@ -1,4 +1,4 @@
-"""Rules editor using plain tkinter widgets."""
+"""Editable panel for managing line and global rules."""
 
 from __future__ import annotations
 
@@ -6,14 +6,18 @@ import copy
 import tkinter as tk
 from typing import Callable
 
-from rules import default_rules_data, validate_rules_data
+from change_tables.models.global_rule import GlobalRule
+from change_tables.models.line_rule import LineRule
+from change_tables.models.rule_set import RuleSet
 
 
 class RulesEditorPanel(tk.Frame):
+    """UI for editing a RuleSet in memory."""
+
     def __init__(self, master: tk.Misc, on_dirty: Callable[[], None], **kwargs) -> None:
         super().__init__(master, **kwargs)
         self.on_dirty = on_dirty
-        self.rules_data = default_rules_data()
+        self._rule_set = RuleSet.empty()
         self._selected_line_index: int | None = None
         self._loading = False
         self.word_30_var = tk.BooleanVar(value=True)
@@ -49,7 +53,7 @@ class RulesEditorPanel(tk.Frame):
 
         self.global_list = tk.Listbox(list_row, height=5)
         self.global_list.grid(row=0, column=0, sticky="ew")
-        self.global_list.bind("<Double-1>", lambda _e: self._edit_global())
+        self.global_list.bind("<Double-1>", lambda _event: self._edit_global())
 
         scroll = tk.Scrollbar(list_row, command=self.global_list.yview)
         scroll.grid(row=0, column=1, sticky="ns")
@@ -95,18 +99,30 @@ class RulesEditorPanel(tk.Frame):
         self.replace_text.grid(row=3, column=0, sticky="nsew", pady=5)
         self.replace_text.bind("<KeyRelease>", self._on_line_field_changed)
 
-    def set_rules_data(self, data: dict) -> None:
+    def set_rule_set(self, rule_set: RuleSet) -> None:
+        """Load a rule set into the editor."""
         self._loading = True
-        self.rules_data = copy.deepcopy(data)
-        self.word_30_var.set(bool(self.rules_data.get("word_30_fallback", True)))
+        self._rule_set = copy.deepcopy(rule_set)
+        self.word_30_var.set(self._rule_set.word_30_fallback)
         self._refresh_global_list()
-        self._refresh_line_list(select_index=0 if self.rules_data.get("lines") else None)
+        self._refresh_line_list(select_index=0 if self._rule_set.lines else None)
         self._loading = False
 
-    def get_rules_data(self) -> dict:
-        data = copy.deepcopy(self.rules_data)
-        data["word_30_fallback"] = self.word_30_var.get()
-        return data
+    def get_rule_set(self) -> RuleSet:
+        """Return a copy of the current editor state."""
+        rule_set = copy.deepcopy(self._rule_set)
+        rule_set.word_30_fallback = self.word_30_var.get()
+        return rule_set
+
+    def commit_edits(self) -> None:
+        """Persist open text fields into the in-memory rule set."""
+        self._save_current_line_rule()
+        self._rule_set.word_30_fallback = self.word_30_var.get()
+
+    def validate(self) -> None:
+        """Validate the current editor state."""
+        self.commit_edits()
+        self._rule_set.validate()
 
     def _mark_dirty(self) -> None:
         if not self._loading:
@@ -114,17 +130,15 @@ class RulesEditorPanel(tk.Frame):
 
     def _refresh_global_list(self) -> None:
         self.global_list.delete(0, tk.END)
-        for entry in self.rules_data.get("global", []):
-            old = entry.get("old", "")
-            new = entry.get("new", "")
-            self.global_list.insert(tk.END, f"{old}  ->  {new}")
+        for rule in self._rule_set.global_rules:
+            self.global_list.insert(tk.END, f"{rule.old}  ->  {rule.new}")
 
     def _add_global(self) -> None:
         old = self.global_old_var.get().strip()
         new = self.global_new_var.get()
         if not old:
             return
-        self.rules_data.setdefault("global", []).append({"old": old, "new": new})
+        self._rule_set.global_rules.append(GlobalRule(old=old, new=new))
         self.global_old_var.set("")
         self.global_new_var.set("")
         self._refresh_global_list()
@@ -135,10 +149,10 @@ class RulesEditorPanel(tk.Frame):
         if not selection:
             return
         index = selection[0]
-        entry = self.rules_data["global"][index]
-        self.global_old_var.set(entry.get("old", ""))
-        self.global_new_var.set(entry.get("new", ""))
-        del self.rules_data["global"][index]
+        rule = self._rule_set.global_rules[index]
+        self.global_old_var.set(rule.old)
+        self.global_new_var.set(rule.new)
+        del self._rule_set.global_rules[index]
         self._refresh_global_list()
         self._mark_dirty()
 
@@ -146,19 +160,18 @@ class RulesEditorPanel(tk.Frame):
         selection = self.global_list.curselection()
         if not selection:
             return
-        del self.rules_data["global"][selection[0]]
+        del self._rule_set.global_rules[selection[0]]
         self._refresh_global_list()
         self._mark_dirty()
 
     def _refresh_line_list(self, select_index: int | None = None) -> None:
         self.line_list.delete(0, tk.END)
-        lines = self.rules_data.get("lines", [])
-        for index, entry in enumerate(lines):
-            preview = entry.get("find", "").replace("\t", " ").strip()[:40] or "(empty)"
+        for index, rule in enumerate(self._rule_set.lines):
+            preview = rule.find.replace("\t", " ").strip()[:40] or "(empty)"
             self.line_list.insert(tk.END, f"{index + 1}. {preview}")
 
-        if select_index is not None and lines:
-            index = max(0, min(select_index, len(lines) - 1))
+        if select_index is not None and self._rule_set.lines:
+            index = max(0, min(select_index, len(self._rule_set.lines) - 1))
             self.line_list.selection_clear(0, tk.END)
             self.line_list.selection_set(index)
             self._load_line_rule(index)
@@ -175,11 +188,10 @@ class RulesEditorPanel(tk.Frame):
         self._loading = False
 
     def _load_line_rule(self, index: int) -> None:
-        lines = self.rules_data.get("lines", [])
-        if 0 <= index < len(lines):
+        if 0 <= index < len(self._rule_set.lines):
             self._selected_line_index = index
-            entry = lines[index]
-            self._set_line_fields(entry.get("find", ""), entry.get("replace", ""))
+            rule = self._rule_set.lines[index]
+            self._set_line_fields(rule.find, rule.replace)
 
     def _on_line_selected(self, _event: tk.Event | None = None) -> None:
         selection = self.line_list.curselection()
@@ -190,12 +202,11 @@ class RulesEditorPanel(tk.Frame):
     def _save_current_line_rule(self) -> None:
         if self._selected_line_index is None:
             return
-        lines = self.rules_data.setdefault("lines", [])
-        if self._selected_line_index < len(lines):
-            lines[self._selected_line_index] = {
-                "find": self.find_text.get("1.0", "end-1c"),
-                "replace": self.replace_text.get("1.0", "end-1c"),
-            }
+        if self._selected_line_index < len(self._rule_set.lines):
+            self._rule_set.lines[self._selected_line_index] = LineRule(
+                find=self.find_text.get("1.0", "end-1c"),
+                replace=self.replace_text.get("1.0", "end-1c"),
+            )
 
     def _on_line_field_changed(self, _event: tk.Event | None = None) -> None:
         if self._loading or self._selected_line_index is None:
@@ -206,8 +217,8 @@ class RulesEditorPanel(tk.Frame):
 
     def _add_line_rule(self) -> None:
         self._save_current_line_rule()
-        self.rules_data.setdefault("lines", []).append({"find": "", "replace": ""})
-        self._refresh_line_list(select_index=len(self.rules_data["lines"]) - 1)
+        self._rule_set.lines.append(LineRule(find="", replace=""))
+        self._refresh_line_list(select_index=len(self._rule_set.lines) - 1)
         self._mark_dirty()
 
     def _remove_line_rule(self) -> None:
@@ -215,8 +226,8 @@ class RulesEditorPanel(tk.Frame):
         if not selection:
             return
         index = selection[0]
-        del self.rules_data["lines"][index]
-        next_index = min(index, len(self.rules_data["lines"]) - 1)
+        del self._rule_set.lines[index]
+        next_index = min(index, len(self._rule_set.lines) - 1)
         self._refresh_line_list(select_index=next_index if next_index >= 0 else None)
         self._mark_dirty()
 
@@ -226,17 +237,9 @@ class RulesEditorPanel(tk.Frame):
             return
         index = selection[0]
         new_index = index + direction
-        lines = self.rules_data.get("lines", [])
-        if 0 <= new_index < len(lines):
+        if 0 <= new_index < len(self._rule_set.lines):
             self._save_current_line_rule()
+            lines = self._rule_set.lines
             lines[index], lines[new_index] = lines[new_index], lines[index]
             self._refresh_line_list(select_index=new_index)
             self._mark_dirty()
-
-    def commit_edits(self) -> None:
-        self._save_current_line_rule()
-        self.rules_data["word_30_fallback"] = self.word_30_var.get()
-
-    def validate(self) -> None:
-        self.commit_edits()
-        validate_rules_data(self.rules_data)
