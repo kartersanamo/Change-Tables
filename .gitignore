@@ -1,2 +1,10 @@
 *.py[cod]
-*.txt
+__pycache__/
+*.pyo
+.venv/
+build/
+dist/
+*.spec.bak
+*_modified.txt
+.DS_Store
+Modflt_old.txt

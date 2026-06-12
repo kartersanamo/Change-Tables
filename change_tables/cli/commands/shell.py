@@ -8,6 +8,7 @@ from argparse import Namespace
 from pathlib import Path
 
 from change_tables.cli.commands.convert import run_convert
+from change_tables.cli.text_input import read_line_text
 from change_tables.cli.output import (
     print_error,
     print_global_rules,
@@ -224,12 +225,12 @@ def _handle_line(tokens: list[str], session: RulesSession, args: Namespace) -> N
     direction = _parse_flag_value(tokens, "--direction")
 
     if action == "add":
-        find_text, replace_text = _read_shell_line_text(find, find_file, replace, replace_file)
+        find_text, replace_text = read_line_text(find, find_file, replace, replace_file)
         session.add_line(find_text, replace_text)
     elif action == "set":
         if index is None:
             raise ValueError("line set requires --index")
-        find_text, replace_text = _read_shell_line_text(find, find_file, replace, replace_file)
+        find_text, replace_text = read_line_text(find, find_file, replace, replace_file)
         session.set_line(index, find_text, replace_text)
     elif action == "remove":
         if index is None:
@@ -242,25 +243,3 @@ def _handle_line(tokens: list[str], session: RulesSession, args: Namespace) -> N
     else:
         raise ValueError(f"Unknown line action: {action}")
     print_message(f"Line rule {action} complete (not saved)", quiet=args.quiet)
-
-
-def _read_shell_line_text(
-    find: str | None,
-    find_file: str | None,
-    replace: str | None,
-    replace_file: str | None,
-) -> tuple[str, str]:
-    if find_file:
-        find_text = Path(find_file).read_text(encoding="utf-8")
-    elif find is not None:
-        find_text = find
-    else:
-        raise ValueError("Line rule requires --find or --find-file")
-
-    if replace_file:
-        replace_text = Path(replace_file).read_text(encoding="utf-8")
-    elif replace is not None:
-        replace_text = replace
-    else:
-        raise ValueError("Line rule requires --replace or --replace-file")
-    return find_text, replace_text

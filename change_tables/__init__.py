@@ -2,8 +2,7 @@
 
 __version__ = "1.0.0"
 
-from change_tables.gui.app import ChangeTablesApp, run_app
 from change_tables.models.rule_set import RuleSet
 from change_tables.services.conversion_service import ConversionService
 
-__all__ = ["ChangeTablesApp", "ConversionService", "RuleSet", "__version__", "run_app"]
+__all__ = ["ConversionService", "RuleSet", "__version__"]

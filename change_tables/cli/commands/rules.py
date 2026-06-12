@@ -6,6 +6,7 @@ import json
 from argparse import Namespace
 from pathlib import Path
 
+from change_tables.cli.text_input import read_line_text
 from change_tables.cli.output import (
     print_error,
     print_global_rules,
@@ -135,10 +136,20 @@ def _line_command(args: Namespace, session: RulesSession) -> int:
 
     try:
         if action == "add":
-            find, replace = _read_line_text(args)
+            find, replace = read_line_text(
+                find=args.find,
+                find_file=args.find_file,
+                replace=args.replace,
+                replace_file=args.replace_file,
+            )
             session.add_line(find, replace)
         elif action == "set":
-            find, replace = _read_line_text(args)
+            find, replace = read_line_text(
+                find=args.find,
+                find_file=args.find_file,
+                replace=args.replace,
+                replace_file=args.replace_file,
+            )
             session.set_line(args.index, find, replace)
         elif action == "remove":
             session.remove_line(args.index)
@@ -155,17 +166,3 @@ def _line_command(args: Namespace, session: RulesSession) -> int:
 
     print_message(f"Line rule {action} complete", quiet=args.quiet)
     return 0
-
-
-def _read_line_text(args: Namespace) -> tuple[str, str]:
-    find = _read_text_arg(args.find, args.find_file, "find")
-    replace = _read_text_arg(args.replace, args.replace_file, "replace")
-    return find, replace
-
-
-def _read_text_arg(value: str | None, file_path: str | None, label: str) -> str:
-    if file_path:
-        return Path(file_path).read_text(encoding="utf-8")
-    if value is not None:
-        return value
-    raise ValueError(f"Line rule requires --{label} or --{label}-file.")

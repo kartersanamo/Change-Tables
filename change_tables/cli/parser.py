@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from change_tables.cli.commands.convert import run_convert
 from change_tables.cli.commands.rules import run_rules
@@ -15,7 +16,7 @@ from change_tables.config import DEFAULT_RULES_PATH
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser."""
     parser = argparse.ArgumentParser(
-        prog="main.py",
+        prog=Path(sys.argv[0]).name,
         description="Change Tables — convert PLC export files using replacement rules.",
         epilog="Run without arguments to open the GUI.",
     )
@@ -162,8 +163,3 @@ def run_cli(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print_error("Interrupted.")
         return 130
-
-
-def main() -> None:
-    """CLI main entry used by main.py."""
-    sys.exit(run_cli())
